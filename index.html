@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>OSI Model Interactive Simulation</title>
+<style>
+  :root{
+    --bg:#08111f;
+    --panel:#0f1d33;
+    --panel2:#132845;
+    --text:#f3f7ff;
+    --muted:#b8c7dc;
+    --accent:#65d1ff;
+    --good:#53d68a;
+    --warn:#ffd166;
+    --bad:#ff6b6b;
+    --shadow:0 18px 40px rgba(0,0,0,.35);
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter,Segoe UI,Arial,sans-serif;
+    background:radial-gradient(circle at top,#132c4b 0,#08111f 45%,#050a12 100%);
+    color:var(--text);
+    min-height:100vh;
+  }
+  header{
+    padding:26px clamp(18px,4vw,48px) 12px;
+    max-width:1400px;
+    margin:auto;
+  }
+  h1{margin:0;font-size:clamp(2rem,4vw,3.2rem)}
+  .subtitle{color:var(--muted);max-width:900px;line-height:1.6}
+  main{
+    max-width:1400px;
+    margin:auto;
+    padding:16px clamp(14px,3vw,42px) 42px;
+  }
+  .toolbar{
+    display:flex;flex-wrap:wrap;gap:10px;margin:14px 0 20px;
+  }
+  button{
+    border:0;border-radius:12px;padding:11px 16px;
+    background:#173252;color:white;font-weight:700;cursor:pointer;
+    transition:.2s transform,.2s background;
+  }
+  button:hover{transform:translateY(-2px);background:#214b77}
+  button.primary{background:linear-gradient(135deg,#1788c7,#29b6d8)}
+  button.good{background:#1c8b57}
+  button.warn{background:#a87500}
+  button:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  .grid{
+    display:grid;grid-template-columns:minmax(280px,430px) 1fr;gap:18px;
+  }
+  @media(max-width:950px){.grid{grid-template-columns:1fr}}
+  .card{
+    background:linear-gradient(180deg,rgba(20,43,74,.96),rgba(10,24,43,.96));
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+  }
+  .stack{padding:16px}
+  .layer{
+    position:relative;
+    border-radius:14px;
+    margin:8px 0;
+    padding:13px 14px;
+    cursor:pointer;
+    display:grid;
+    grid-template-columns:48px 1fr;
+    gap:12px;
+    align-items:center;
+    border:2px solid transparent;
+    transition:.25s transform,.25s border-color,.25s filter;
+    overflow:hidden;
+  }
+  .layer::after{
+    content:"";position:absolute;inset:0;
+    background:linear-gradient(120deg,transparent,rgba(255,255,255,.13),transparent);
+    transform:translateX(-120%);
+  }
+  .layer.active::after{animation:shine 1s linear}
+  @keyframes shine{to{transform:translateX(120%)}}
+  .layer.active{border-color:white;transform:scale(1.025);filter:brightness(1.12)}
+  .n{
+    width:42px;height:42px;border-radius:50%;
+    display:grid;place-items:center;background:rgba(0,0,0,.22);font-weight:900;font-size:1.1rem
+  }
+  .lname{font-weight:900;font-size:1.05rem}
+  .mini{font-size:.82rem;opacity:.9;margin-top:2px}
+  .l7{background:#6b4cc5}.l6{background:#7b58c8}.l5{background:#835fbe}
+  .l4{background:#207cb8}.l3{background:#17669b}.l2{background:#0c4d78}.l1{background:#09334f}
+  .stage{padding:18px;min-height:620px;display:flex;flex-direction:column}
+  .scene{
+    position:relative;
+    flex:1;min-height:430px;
+    border-radius:16px;
+    background:
+      linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px),
+      #071321;
+    background-size:28px 28px;
+    overflow:hidden;
+    border:1px solid rgba(255,255,255,.08);
+  }
+  .host{
+    position:absolute;top:44%;transform:translateY(-50%);
+    width:148px;min-height:170px;padding:12px;border-radius:16px;
+    background:#12263f;border:1px solid rgba(255,255,255,.12);
+    box-shadow:0 10px 25px rgba(0,0,0,.3);text-align:center;
+  }
+  .host.left{left:3%}.host.right{right:3%}
+  .screen{
+    margin:8px auto 10px;width:92px;height:62px;border-radius:8px;
+    background:linear-gradient(145deg,#112b48,#1d4d74);
+    border:4px solid #263b52;display:grid;place-items:center;font-size:1.7rem
+  }
+  .router{
+    position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);
+    width:120px;height:78px;border-radius:50%;
+    background:#183e66;border:3px solid #65d1ff;display:grid;place-items:center;
+    font-weight:900;box-shadow:0 0 30px rgba(101,209,255,.25)
+  }
+  .link{
+    position:absolute;left:15%;right:15%;top:44%;
+    height:6px;background:#244966;transform:translateY(-50%);
+    box-shadow:0 0 10px rgba(101,209,255,.25)
+  }
+  .packet{
+    position:absolute;top:calc(44% - 22px);left:15%;
+    min-width:58px;height:44px;padding:0 10px;border-radius:10px;
+    background:#ffd166;color:#142033;font-weight:900;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 0 20px rgba(255,209,102,.45);
+    transition:left 1.15s ease, transform .35s ease, width .35s ease, background .35s ease;
+    z-index:10;
+  }
+  .packet.moving{animation:bob .35s infinite alternate}
+  @keyframes bob{to{transform:translateY(-4px)}}
+  .info{
+    margin-top:14px;background:#0b192b;border-left:5px solid var(--accent);
+    padding:14px 16px;border-radius:12px;line-height:1.55;min-height:130px
+  }
+  .info h2{margin:0 0 6px;font-size:1.25rem}
+  .badges{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+  .badge{font-size:.8rem;padding:5px 9px;border-radius:999px;background:#183454;color:#d9efff}
+  .quiz{margin-top:18px;padding:18px}
+  .quiz h3{margin-top:0}
+  .option{
+    display:block;width:100%;text-align:left;margin:8px 0;
+    background:#122a46;border:1px solid rgba(255,255,255,.08);
+  }
+  .option.correct{background:#17673f}.option.incorrect{background:#7d2e35}
+  .feedback{min-height:26px;margin-top:10px;font-weight:700}
+  .pdu-strip{
+    position:absolute;left:50%;bottom:18px;transform:translateX(-50%);
+    width:min(84%,760px);display:flex;justify-content:center;gap:5px;flex-wrap:wrap
+  }
+  .pdu{
+    padding:8px 10px;border-radius:8px;background:#172a42;border:1px solid rgba(255,255,255,.08);
+    font-size:.82rem;opacity:.35;transition:.25s
+  }
+  .pdu.on{opacity:1;transform:translateY(-5px);background:#23527f}
+  .legend{
+    display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px
+  }
+  @media(max-width:700px){.legend{grid-template-columns:1fr}.host{width:115px}.router{width:95px}}
+  .legend div{background:#0b192b;border-radius:12px;padding:12px}
+  .legend strong{display:block;margin-bottom:4px}
+  .progress{
+    height:8px;border-radius:999px;background:#16283c;overflow:hidden;margin-bottom:12px
+  }
+  .progress span{display:block;height:100%;width:0;background:linear-gradient(90deg,#34a5e7,#53d68a);transition:.35s}
+  .note{font-size:.88rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <h1>OSI Model Interactive Simulation</h1>
+  <p class="subtitle">
+    Follow a message from an application on one host, down through all seven OSI layers,
+    across a network, and back up the stack on the receiving host. Select any layer to inspect
+    its job, devices, protocols, strengths, limitations, and security implications.
+  </p>
+</header>
+
+<main>
+  <div class="toolbar">
+    <button class="primary" id="autoBtn">▶ Run Full Encapsulation Simulation</button>
+    <button id="stepBtn">Step Forward</button>
+    <button id="resetBtn">Reset</button>
+    <button class="warn" id="faultBtn">Inject a Network Fault</button>
+  </div>
+
+  <div class="progress"><span id="progressBar"></span></div>
+
+  <div class="grid">
+    <section class="card stack" aria-label="OSI layers">
+      <div id="layers"></div>
+      <p class="note">Tip: Select a layer, then answer the question below the simulation.</p>
+    </section>
+
+    <section class="card stage">
+      <div class="scene" id="scene">
+        <div class="link"></div>
+        <div class="host left"><div class="screen">🖥️</div><strong>Sender</strong><br><span class="note">Student workstation</span></div>
+        <div class="router">ROUTER<br>L3</div>
+        <div class="host right"><div class="screen">🌐</div><strong>Receiver</strong><br><span class="note">Web server</span></div>
+        <div class="packet" id="packet">DATA</div>
+        <div class="pdu-strip" id="pduStrip"></div>
+      </div>
+
+      <div class="info" id="info"></div>
+
+      <div class="legend">
+        <div><strong>Upper layers</strong><span class="note">Layers 5–7 focus on application communication, presentation, and sessions.</span></div>
+        <div><strong>Lower layers</strong><span class="note">Layers 1–4 move data end-to-end and across physical media.</span></div>
+        <div><strong>Key idea</strong><span class="note">Each layer adds, interprets, or removes control information.</span></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card quiz" id="quiz"></section>
+</main>
+
+<script>
+const layerData = [
+ {n:7,name:"Application",short:"Network services for user applications",color:"l7",
+  pdu:"Data",example:"HTTPS, DNS, SMTP, FTP",
+  device:"Proxy, application gateway",
+  security:"Phishing, insecure APIs, web attacks",
+  text:"Layer 7 provides network services to applications and identifies communication partners and resources. A browser is not itself the Application layer; it uses Application-layer protocols when it needs a remote resource.",
+  advantage:"Makes network services accessible to software through well-defined interfaces.",
+  disadvantage:"Many attacks target this layer because it is closest to users, data, and business logic.",
+  q:"Which statement is most accurate about a web browser and OSI Layer 7?",
+  opts:["The browser physically resides inside Layer 7.","The browser uses Application-layer protocols when accessing remote resources.","The browser routes packets between networks.","The browser converts frames into bits."], ans:1},
+ {n:6,name:"Presentation",short:"Translation, formatting, encryption, compression",color:"l6",
+  pdu:"Data",example:"TLS formatting, JPEG, Unicode, compression",
+  device:"Encryption gateway",
+  security:"Weak encryption, downgrade attacks, malformed data",
+  text:"Layer 6 presents data in a form that the receiving application can understand. It handles translation, code formatting, compression, decompression, encryption, and decryption.",
+  advantage:"Allows different systems and data formats to interoperate.",
+  disadvantage:"Extra transformation can add processing overhead and complexity.",
+  q:"True or False: Encryption and data-format translation are commonly associated with the Presentation layer.",
+  opts:["True","False"], ans:0},
+ {n:5,name:"Session",short:"Establishes, manages, and ends dialogs",color:"l5",
+  pdu:"Data",example:"Session checkpoints, dialog control",
+  device:"Session border controller",
+  security:"Session hijacking, token theft",
+  text:"Layer 5 establishes, manages, and tears down communication sessions. It keeps different application conversations separate and supports simplex, half-duplex, and full-duplex dialog control.",
+  advantage:"Organizes multiple simultaneous conversations and supports recovery checkpoints.",
+  disadvantage:"Session state can be difficult to manage at scale and can be targeted by hijacking attacks.",
+  q:"A user opens several browser tabs connected to different websites. Which layer helps keep those conversations separate?",
+  opts:["Physical","Data Link","Session","Network"], ans:2},
+ {n:4,name:"Transport",short:"Segmentation, reliability, ports, flow control",color:"l4",
+  pdu:"Segment",example:"TCP, UDP, port numbers",
+  device:"Stateful firewall, load balancer",
+  security:"Port scanning, SYN floods, UDP abuse",
+  text:"Layer 4 segments and reassembles data. TCP can provide connection-oriented reliability using sequencing, acknowledgments, retransmission, windowing, and flow control. UDP provides lower-overhead connectionless transport.",
+  advantage:"Applications can choose reliable TCP or faster, lower-overhead UDP.",
+  disadvantage:"Reliability adds latency and overhead; connectionless transport can lose or reorder data.",
+  q:"Which feature is associated with reliable, connection-oriented transport?",
+  opts:["MAC addressing only","Acknowledgments and sequencing","Fiber-optic light pulses","Routing-table lookup"], ans:1},
+ {n:3,name:"Network",short:"Logical addressing and routing",color:"l3",
+  pdu:"Packet",example:"IPv4, IPv6, ICMP, OSPF",
+  device:"Router, Layer 3 switch",
+  security:"IP spoofing, route manipulation, ACL errors",
+  text:"Layer 3 uses logical addresses and routing information to move packets between different networks. A router checks the destination IP address, consults its routing table, selects an exit interface, and drops the packet if no route exists.",
+  advantage:"Enables scalable communication across multiple interconnected networks.",
+  disadvantage:"Routing mistakes, loops, and misconfigured access controls can disrupt large portions of a network.",
+  q:"What does a router primarily examine to forward a packet?",
+  opts:["Destination IP address","Destination application window","File extension","Keyboard scan code"], ans:0},
+ {n:2,name:"Data Link",short:"Frames, MAC addressing, local delivery",color:"l2",
+  pdu:"Frame",example:"Ethernet, Wi-Fi, MAC, LLC",
+  device:"Switch, bridge, wireless access point",
+  security:"MAC flooding, ARP spoofing, VLAN hopping",
+  text:"Layer 2 turns packets into frames for local-network delivery. It uses source and destination MAC addresses, supports error notification, and includes the MAC and LLC sublayers. Frame headers are replaced at each routed hop while the Layer 3 packet remains intact.",
+  advantage:"Efficient local delivery and hardware-based identification within a LAN.",
+  disadvantage:"Broadcasts and Layer 2 attacks can spread rapidly within the same broadcast domain.",
+  q:"What changes as an IP packet passes through multiple routers?",
+  opts:["The original application data is rewritten at every hop.","The Layer 2 frame header is replaced for each local link.","The destination IP address always becomes the router's IP.","The packet becomes a session."], ans:1},
+ {n:1,name:"Physical",short:"Signals, media, connectors, topology",color:"l1",
+  pdu:"Bits",example:"Copper, fiber, radio, connectors",
+  device:"Cable, repeater, hub, transceiver",
+  security:"Cable taps, jamming, device theft",
+  text:"Layer 1 sends and receives raw bits as electrical, optical, or radio signals. It defines media, connectors, pinouts, signal timing, encoding, and physical topology.",
+  advantage:"Creates standardized electrical, mechanical, and signaling requirements.",
+  disadvantage:"It cannot understand addresses or applications and cannot correct higher-layer errors.",
+  q:"Which item belongs most directly to the Physical layer?",
+  opts:["TCP acknowledgment","MAC address table","Voltage transition on copper cable","DNS query"], ans:2}
+];
+
+const pduNames = ["Data","Data","Data","Segment","Packet","Frame","Bits"];
+let selected=0;
+let step=0;
+let autoTimer=null;
+let direction="down";
+const layersEl=document.getElementById("layers");
+const infoEl=document.getElementById("info");
+const quizEl=document.getElementById("quiz");
+const packet=document.getElementById("packet");
+const pduStrip=document.getElementById("pduStrip");
+const progressBar=document.getElementById("progressBar");
+
+function renderLayers(){
+ layersEl.innerHTML="";
+ layerData.forEach((l,i)=>{
+  const d=document.createElement("div");
+  d.className=`layer ${l.color} ${i===selected?"active":""}`;
+  d.innerHTML=`<div class="n">${l.n}</div><div><div class="lname">${l.name}</div><div class="mini">${l.short}</div></div>`;
+  d.onclick=()=>selectLayer(i);
+  layersEl.appendChild(d);
+ });
+}
+function renderPdus(activeIndex=-1){
+ pduStrip.innerHTML="";
+ pduNames.forEach((p,i)=>{
+  const e=document.createElement("div");
+  e.className="pdu"+(i===activeIndex?" on":"");
+  e.textContent=`L${7-i}: ${p}`;
+  pduStrip.appendChild(e);
+ });
+}
+function selectLayer(i){
+ selected=i;
+ renderLayers();
+ renderPdus(i);
+ const l=layerData[i];
+ infoEl.innerHTML=`
+   <h2>Layer ${l.n}: ${l.name}</h2>
+   <div>${l.text}</div>
+   <div class="badges">
+     <span class="badge"><b>PDU:</b> ${l.pdu}</span>
+     <span class="badge"><b>Examples:</b> ${l.example}</span>
+     <span class="badge"><b>Device:</b> ${l.device}</span>
+     <span class="badge"><b>Security:</b> ${l.security}</span>
+   </div>
+   <p><b>Advantage:</b> ${l.advantage}</p>
+   <p><b>Disadvantage:</b> ${l.disadvantage}</p>`;
+ renderQuiz(l);
+}
+function renderQuiz(l){
+ quizEl.innerHTML=`<h3>Knowledge Check — Layer ${l.n}</h3><p>${l.q}</p>`;
+ const fb=document.createElement("div"); fb.className="feedback";
+ l.opts.forEach((o,idx)=>{
+   const b=document.createElement("button");
+   b.className="option";b.textContent=o;
+   b.onclick=()=>{
+     [...quizEl.querySelectorAll(".option")].forEach(x=>x.disabled=true);
+     if(idx===l.ans){b.classList.add("correct");fb.textContent="Correct. The answer matches the role of this OSI layer."}
+     else{b.classList.add("incorrect");quizEl.querySelectorAll(".option")[l.ans].classList.add("correct");fb.textContent="Review the explanation above, then compare the answer to the layer's core function."}
+   };
+   quizEl.appendChild(b);
+ });
+ quizEl.appendChild(fb);
+}
+function resetSim(){
+ clearInterval(autoTimer);autoTimer=null;step=0;direction="down";
+ packet.style.left="15%";packet.style.background="#ffd166";packet.textContent="DATA";
+ packet.classList.remove("moving");progressBar.style.width="0%";
+ selectLayer(0);
+}
+function advance(){
+ const sequence=[0,1,2,3,4,5,6,6,5,4,3,2,1,0];
+ if(step>=sequence.length){packet.style.left="81%";packet.classList.remove("moving");return false}
+ const idx=sequence[step];
+ selected=idx;renderLayers();renderPdus(idx);
+ const l=layerData[idx];
+ const descending=step<7;
+ direction=descending?"down":"up";
+ packet.textContent=l.pdu.toUpperCase();
+ packet.style.width=(58+(idx*4))+"px";
+ packet.style.background=descending?"#ffd166":"#53d68a";
+ const pos=15+(step/(sequence.length-1))*66;
+ packet.style.left=pos+"%";
+ packet.classList.add("moving");
+ infoEl.innerHTML=`<h2>${descending?"Encapsulation":"De-encapsulation"} — Layer ${l.n}: ${l.name}</h2>
+ <p>${descending ? "The sender is processing data downward through the stack." : "The receiver is removing or interpreting control information while moving upward through the stack."}</p>
+ <p>${l.text}</p>
+ <p><b>Current protocol data unit:</b> ${l.pdu}</p>`;
+ progressBar.style.width=((step+1)/sequence.length*100)+"%";
+ step++;
+ return true;
+}
+document.getElementById("stepBtn").onclick=advance;
+document.getElementById("resetBtn").onclick=resetSim;
+document.getElementById("autoBtn").onclick=()=>{
+ resetSim();
+ autoTimer=setInterval(()=>{if(!advance()){clearInterval(autoTimer);autoTimer=null}},1250);
+};
+document.getElementById("faultBtn").onclick=()=>{
+ clearInterval(autoTimer);autoTimer=null;
+ packet.style.background="#ff6b6b";packet.textContent="FAULT";
+ const faults=[
+  {i:6,msg:"Physical fault: A damaged cable or jammed radio signal prevents bits from reaching the next device."},
+  {i:5,msg:"Data Link fault: A switch cannot locate the destination MAC address and floods the frame, or a corrupted frame is discarded."},
+  {i:4,msg:"Network fault: The router has no matching route, so it drops the packet."},
+  {i:3,msg:"Transport fault: A TCP segment is not acknowledged, causing retransmission. With UDP, the loss may not be recovered."}
+ ];
+ const f=faults[Math.floor(Math.random()*faults.length)];
+ selected=f.i;renderLayers();renderPdus(f.i);
+ infoEl.innerHTML=`<h2>Fault Injection — Layer ${layerData[f.i].n}</h2><p>${f.msg}</p>
+ <p><b>Troubleshooting advantage of the OSI model:</b> The layered structure narrows the investigation to a specific function instead of treating the network as one large, undifferentiated system.</p>
+ <p><b>Limitation:</b> Real protocols do not always fit perfectly into one OSI layer, so technicians must also understand the TCP/IP model and actual implementation behavior.</p>`;
+};
+renderLayers();renderPdus();selectLayer(0);
+</script>
+</body>
+</html>
