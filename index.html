@@ -174,6 +174,22 @@
   }
   .progress span{display:block;height:100%;width:0;background:linear-gradient(90deg,#34a5e7,#53d68a);transition:.35s}
   .note{font-size:.88rem;color:var(--muted)}
+
+  .student-instructions{margin:0 0 18px;padding:18px;background:linear-gradient(135deg,rgba(23,136,199,.18),rgba(83,214,138,.12));border:1px solid rgba(101,209,255,.35);border-radius:16px}
+  .student-instructions h2{margin:0 0 8px;font-size:1.25rem}
+  .student-instructions ol{margin:8px 0 0 20px;line-height:1.65}
+  .scoreboard{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 16px}
+  .scorebox{background:#0d2139;border:1px solid rgba(255,255,255,.1);padding:10px 14px;border-radius:12px;font-weight:800}
+  .scorebox span{color:#65d1ff}
+  .completion{display:none;margin-top:18px;padding:22px;border-radius:18px;background:linear-gradient(135deg,#123d2e,#163f59);border:2px solid #53d68a;box-shadow:0 0 35px rgba(83,214,138,.22);text-align:center}
+  .completion.show{display:block}
+  .completion h2{margin:0 0 8px;font-size:1.8rem}
+  .completion .bigscore{font-size:2.4rem;font-weight:900;color:#8ff0b8}
+  .completion-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+  .completion-grid div{background:rgba(0,0,0,.16);padding:12px;border-radius:12px}
+  @media(max-width:700px){.completion-grid{grid-template-columns:1fr}}
+  .visited::before{content:"✓";position:absolute;right:12px;top:50%;transform:translateY(-50%);width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:#53d68a;color:#062116;font-weight:900}
+
 </style>
 </head>
 <body>
@@ -181,12 +197,30 @@
   <h1>OSI Model Interactive Simulation</h1>
   <p class="subtitle">
     Follow a message from an application on one host, down through all seven OSI layers,
-    across a network, and back up the stack on the receiving host. Select any layer to inspect
-    its job, devices, protocols, strengths, limitations, and security implications.
+    across a network, and back up the stack on the receiving host. Complete each layer question,
+    earn all available points, and capture the final completion panel as your submission evidence.
   </p>
 </header>
 
 <main>
+
+  <section class="student-instructions" aria-label="Student instructions">
+    <h2>Student Instructions</h2>
+    <ol>
+      <li>Select each OSI layer in order, beginning with <strong>Layer 7</strong> and continuing through <strong>Layer 1</strong>.</li>
+      <li>Read the explanation, examples, advantages, disadvantages, and security concerns for each layer.</li>
+      <li>Answer the multiple-choice or true/false question at the bottom of the simulation.</li>
+      <li>You earn <strong>10 points</strong> for each correct answer. Incorrect answers display a short explanation and allow another attempt.</li>
+      <li>After completing all seven layers, run the encapsulation animation and capture a screenshot of the final completion panel for Canvas submission.</li>
+    </ol>
+  </section>
+
+  <div class="scoreboard" aria-live="polite">
+    <div class="scorebox">Score: <span id="scoreValue">0</span> / 70</div>
+    <div class="scorebox">Layers Completed: <span id="completedValue">0</span> / 7</div>
+    <div class="scorebox">Animation: <span id="animationValue">Not completed</span></div>
+  </div>
+
   <div class="toolbar">
     <button class="primary" id="autoBtn">▶ Run Full Encapsulation Simulation</button>
     <button id="stepBtn">Step Forward</button>
@@ -223,6 +257,18 @@
   </div>
 
   <section class="card quiz" id="quiz"></section>
+
+  <section class="completion" id="completionPanel" aria-live="polite">
+    <h2>OSI Model Simulation Completed</h2>
+    <div class="bigscore"><span id="finalScore">0</span> / 70 Points</div>
+    <p id="completionMessage">Complete every layer question and the full animation to finish.</p>
+    <div class="completion-grid">
+      <div><strong>Questions Completed</strong><br><span id="finalCompleted">0</span> of 7</div>
+      <div><strong>Full Animation</strong><br><span id="finalAnimation">Not completed</span></div>
+      <div><strong>Submission</strong><br>Take a screenshot of this panel</div>
+    </div>
+  </section>
+
 </main>
 
 <script>
@@ -297,18 +343,30 @@ let selected=0;
 let step=0;
 let autoTimer=null;
 let direction="down";
+let score=0;
+let animationComplete=false;
+const completedLayers=new Set();
+const attemptedLayers=new Set();
 const layersEl=document.getElementById("layers");
 const infoEl=document.getElementById("info");
 const quizEl=document.getElementById("quiz");
 const packet=document.getElementById("packet");
 const pduStrip=document.getElementById("pduStrip");
 const progressBar=document.getElementById("progressBar");
+const scoreValue=document.getElementById("scoreValue");
+const completedValue=document.getElementById("completedValue");
+const animationValue=document.getElementById("animationValue");
+const completionPanel=document.getElementById("completionPanel");
+const finalScore=document.getElementById("finalScore");
+const finalCompleted=document.getElementById("finalCompleted");
+const finalAnimation=document.getElementById("finalAnimation");
+const completionMessage=document.getElementById("completionMessage");
 
 function renderLayers(){
  layersEl.innerHTML="";
  layerData.forEach((l,i)=>{
   const d=document.createElement("div");
-  d.className=`layer ${l.color} ${i===selected?"active":""}`;
+  d.className=`layer ${l.color} ${i===selected?"active":""} ${completedLayers.has(i)?"visited":""}`;
   d.innerHTML=`<div class="n">${l.n}</div><div><div class="lname">${l.name}</div><div class="mini">${l.short}</div></div>`;
   d.onclick=()=>selectLayer(i);
   layersEl.appendChild(d);
@@ -341,19 +399,53 @@ function selectLayer(i){
    <p><b>Disadvantage:</b> ${l.disadvantage}</p>`;
  renderQuiz(l);
 }
+function updateScoreboard(){
+ scoreValue.textContent=score;
+ completedValue.textContent=completedLayers.size;
+ animationValue.textContent=animationComplete?"Completed":"Not completed";
+ finalScore.textContent=score;
+ finalCompleted.textContent=completedLayers.size;
+ finalAnimation.textContent=animationComplete?"Completed":"Not completed";
+ const finished=completedLayers.size===7 && animationComplete;
+ completionPanel.classList.toggle("show",finished);
+ completionMessage.textContent=finished
+   ? "Excellent work. You completed all seven OSI layer questions and the full encapsulation simulation. Capture a screenshot of this panel for your Canvas submission."
+   : "Complete every layer question and the full animation to finish.";
+}
 function renderQuiz(l){
+ const layerIndex=layerData.indexOf(l);
  quizEl.innerHTML=`<h3>Knowledge Check — Layer ${l.n}</h3><p>${l.q}</p>`;
  const fb=document.createElement("div"); fb.className="feedback";
  l.opts.forEach((o,idx)=>{
    const b=document.createElement("button");
    b.className="option";b.textContent=o;
+   if(completedLayers.has(layerIndex)) b.disabled=true;
    b.onclick=()=>{
-     [...quizEl.querySelectorAll(".option")].forEach(x=>x.disabled=true);
-     if(idx===l.ans){b.classList.add("correct");fb.textContent="Correct. The answer matches the role of this OSI layer."}
-     else{b.classList.add("incorrect");quizEl.querySelectorAll(".option")[l.ans].classList.add("correct");fb.textContent="Review the explanation above, then compare the answer to the layer's core function."}
+     attemptedLayers.add(layerIndex);
+     if(idx===l.ans){
+       [...quizEl.querySelectorAll(".option")].forEach(x=>x.disabled=true);
+       b.classList.add("correct");
+       if(!completedLayers.has(layerIndex)){completedLayers.add(layerIndex);score+=10;}
+       fb.textContent="Correct. You earned 10 points for this layer.";
+       renderLayers();updateScoreboard();
+     } else {
+       b.classList.add("incorrect");
+       const explanations=[
+         "A browser is an application that uses Layer 7 protocols such as HTTPS or DNS; it is not physically contained inside the OSI layer.",
+         "Presentation-layer functions include translation, formatting, encryption, decryption, compression, and decompression.",
+         "The Session layer establishes, manages, separates, and terminates application conversations.",
+         "Reliable transport uses sequencing, acknowledgments, retransmission, windowing, and flow control.",
+         "Routers make forwarding decisions primarily from the destination logical address, normally the destination IP address.",
+         "Routers remove the incoming Layer 2 frame and build a new frame for the next link while preserving the Layer 3 packet.",
+         "Electrical voltage, light pulses, radio signals, cabling, connectors, and pinouts are Physical-layer concerns."
+       ];
+       fb.textContent="Incorrect. "+explanations[layerIndex]+" Select another answer.";
+       setTimeout(()=>b.classList.remove("incorrect"),700);
+     }
    };
    quizEl.appendChild(b);
  });
+ if(completedLayers.has(layerIndex)) fb.textContent="Completed — 10 points earned for this layer.";
  quizEl.appendChild(fb);
 }
 function resetSim(){
@@ -361,10 +453,11 @@ function resetSim(){
  packet.style.left="15%";packet.style.background="#ffd166";packet.textContent="DATA";
  packet.classList.remove("moving");progressBar.style.width="0%";
  selectLayer(0);
+ updateScoreboard();
 }
 function advance(){
  const sequence=[0,1,2,3,4,5,6,6,5,4,3,2,1,0];
- if(step>=sequence.length){packet.style.left="81%";packet.classList.remove("moving");return false}
+ if(step>=sequence.length){packet.style.left="81%";packet.classList.remove("moving");animationComplete=true;updateScoreboard();return false}
  const idx=sequence[step];
  selected=idx;renderLayers();renderPdus(idx);
  const l=layerData[idx];
@@ -405,7 +498,7 @@ document.getElementById("faultBtn").onclick=()=>{
  <p><b>Troubleshooting advantage of the OSI model:</b> The layered structure narrows the investigation to a specific function instead of treating the network as one large, undifferentiated system.</p>
  <p><b>Limitation:</b> Real protocols do not always fit perfectly into one OSI layer, so technicians must also understand the TCP/IP model and actual implementation behavior.</p>`;
 };
-renderLayers();renderPdus();selectLayer(0);
+renderLayers();renderPdus();selectLayer(0);updateScoreboard();
 </script>
 </body>
 </html>
